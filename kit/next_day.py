@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """"Story next day" – teaser story for what's coming (1080x1920). No current km, no record, no time.
-Top half: photo. Bottom half: light sand panel with UP NEXT headline, from -> to, distance / climbing / high point,
+Full-bleed photo under a sand overlay (light at the top, strong behind the content) with UP NEXT headline, from -> to, distance / climbing / high point,
 elevation profile of the next ~250 km with places, and 2-3 short teaser lines.
 
 The window starts at the current position (--km, or the photo's GPS snapped to the track) and ends at the
 place closest to km+250 within 200..300 km (or --to-km).
-Teaser lines come from the caller (Claude writes them from route_context.py / the guide sections):
-  --line "No water for 200 km" --line "Wild Pacific coast" --line "Fish camps, no shops"
-Usage: next_day.py PHOTO OUT.jpg [--km 688] [--to-km 881] [--line ...]x3 [--focus 0.5] [--hfocus 0.5]
+The teaser text comes from the caller (Claude writes it from route_context.py / the guide sections), 3-4 lines wrapped:
+  --text "The longest stretch of the whole route without water. ..."
+Usage: next_day.py PHOTO OUT.jpg [--km 688] [--to-km 881] --text "..." [--overlay 224] [--focus 0.5] [--hfocus 0.5]
 """
 import argparse, json, math, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
@@ -31,7 +31,7 @@ def font(name, size):
 ap = argparse.ArgumentParser()
 ap.add_argument("photo"); ap.add_argument("out")
 ap.add_argument("--km", type=float); ap.add_argument("--to-km", type=float)
-ap.add_argument("--line", action="append", default=[])
+ap.add_argument("--text", default="", help="short teaser, 3-4 lines when wrapped")
 ap.add_argument("--overlay", type=int, default=224)
 ap.add_argument("--focus", type=float, default=0.5); ap.add_argument("--hfocus", type=float, default=0.5)
 a = ap.parse_args()
@@ -63,7 +63,7 @@ top_k, top_e = max(prof, key=lambda p: p[1])
 nk = lambda x: f"{int(round(x)):,}".replace(",", ".")
 
 # ---------- photo top ----------
-PH = 860
+PH = 980
 im = ImageOps.exif_transpose(src).convert("RGB"); r = W / H
 if im.width / im.height > r:
     nw = round(im.height * r); x0 = round((im.width - nw) * a.hfocus); im = im.crop((x0, 0, x0 + nw, im.height))
@@ -120,22 +120,22 @@ def make_logo(cap, sand=SAND):
         else: dr.text((x, base), s, font=fa, fill=sand + (255,), anchor="ls"); x += fa.getlength(s)
     return img.resize((img.width // S4, img.height // S4), Image.LANCZOS)
 L = 64
-canvas.alpha_composite(make_logo(40), (L, 250))
 
 # ---------- panel edge: terracotta band with UP NEXT tab ----------
-d.rectangle([0, PH - 3, W, PH + 3], fill=TERRA + (255,))
-tab_w = 290; d.rectangle([L, PH - 52, L + tab_w, PH + 3], fill=TERRA + (255,))
-spaced(d, (L + tab_w / 2, PH - 16), "UP NEXT", font("Anton", 40), (255, 255, 255, 255), 6, "ms")
+d.rectangle([0, PH - 2, W, PH + 2], fill=TERRA + (255,))
+ft = font("Anton", 36); tw_ = spaced(ImageDraw.Draw(Image.new("RGBA", (1, 1))), (0, 0), "UP NEXT", ft, (0, 0, 0, 0), 6)
+d.rectangle([L, PH + 40, L + tw_ + 44, PH + 94], fill=TERRA + (255,))
+spaced(d, (L + 22, PH + 83), "UP NEXT", ft, (255, 255, 255, 255), 6)
 
 # ---------- headline: distance + from -> to ----------
-y = PH + 140
+y = PH + 225
 spaced(d, (L, y), f"NEXT {nk(dist)} KM", font("Anton", 118), INK + (255,), 0)
 if frm_name or to_name:
     t = f"{frm_name.upper()}  →  {(to_name or '').upper()}".strip() if frm_name else f"TO {to_name.upper()}"
     spaced(d, (L, y + 52), t, font("Inter ExtraBold", 28), TERRA + (255,), 2)
 
 # ---------- stat row ----------
-y = PH + 290
+y = PH + 385
 cols = [(nk(gain) + " M", "CLIMBING"), (nk(top_e) + " M", "HIGH POINT")]
 cw = (W - 2 * L) / 2.6
 for i, (v, lbl) in enumerate(cols):
@@ -145,7 +145,7 @@ for i, (v, lbl) in enumerate(cols):
     spaced(d, (x, y + 28), lbl, font("Inter Bold", 19), MUTED + (255,), 3)
 
 # ---------- elevation profile ----------
-px0, px1, py0, py1 = L, W - L, PH + 390, PH + 560       # chart box
+px0, px1, py0, py1 = L, W - L, PH + 455, PH + 570       # chart box
 emax = max(e for _, e in prof); emin = 0; span = max(400, emax - emin)
 X = lambda k: px0 + (k - km) / (k1 - km) * (px1 - px0)
 Y = lambda e: py1 - (e - emin) / span * (py1 - py0)
@@ -170,13 +170,17 @@ fk = font("Inter Bold", 17)
 spaced(d, (px0, py1 + 30), (frm_name or "FROM HERE").upper(), fk, MUTED + (255,), 2)
 spaced(d, (px1, py1 + 30), (to_name or f"+{nk(dist)} KM").upper(), fk, MUTED + (255,), 2, "rs")
 
-# ---------- teaser lines ----------
-y = py1 + 105
-for ln in a.line[:3]:
-    d.ellipse([L, y - 22, L + 16, y - 6], fill=TERRA + (255,))
-    spaced(d, (L + 34, y), ln.upper(), font("Inter ExtraBold", 31), INK + (255,), 1.5)
-    y += 54
-
-d.rectangle([0, H - 14, W, H], fill=TERRA + (255,))
+# ---------- teaser text (wrapped, 3-4 lines) ----------
+ftx = font("Inter Bold", 36); maxw = W - 2 * L; lines, cur = [], ""
+import re
+for w_ in re.sub(r"(\d) (km|m|h|l)\b", "\\1\u00a0\\2", a.text).split():
+    t = (cur + " " + w_).strip()
+    if d.textlength(t, font=ftx) <= maxw: cur = t
+    else: lines.append(cur); cur = w_
+if cur: lines.append(cur)
+y = py1 + 90
+for ln in lines:
+    d.text((L, y), ln, font=ftx, fill=INK + (255,), anchor="ls"); y += 50
+if len(lines) > 4: print("WARNING: teaser wraps to", len(lines), "lines – shorten it", file=sys.stderr)
 canvas.convert("RGB").save(a.out, quality=92, subsampling=0)
-print("saved", a.out, {"from_km": km, "to_km": k1, "from": frm_name, "to": to_name, "dist": round(dist), "gain": round(gain), "high": round(top_e), "lines_y_end": y})
+print("saved", a.out, {"from_km": km, "to_km": k1, "from": frm_name, "to": to_name, "dist": round(dist), "gain": round(gain), "high": round(top_e), "text_lines": len(lines), "text_y_end": y - 50})
