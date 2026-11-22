@@ -164,7 +164,7 @@ if delta is not None:
     spaced(d, (L, yb), ("▲ " if ahead else "▼ ") + hm(delta) + " H", font("Anton", 112), col + (255,), 0)
     spaced(d, (L, yb + 46), "AHEAD OF FKT PACE" if ahead else "BEHIND FKT PACE", font("Inter ExtraBold", 28), col + (255,), 3)
     spaced(d, (L, yb + 92), "RECORD  10 D 13 H 24 MIN", font("Inter Bold", 22), SAND + (200,), 2)
-    spaced(d, (L, yb + 124), f"FKT GHOST AT KM {nk(ghost_km)}", font("Inter Bold", 22), SAND + (200,), 2)
+    spaced(d, (L, yb + 124), f"FKT DOT AT KM {nk(ghost_km)}", font("Inter Bold", 22), SAND + (200,), 2)
 
 # ---------- footer: progress bar with ghost ----------
 FY = 1700; x0, x1 = L * SS, (W - L) * SS; ry = FY * SS; th = 10 * SS
