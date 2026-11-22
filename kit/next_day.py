@@ -32,6 +32,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("photo"); ap.add_argument("out")
 ap.add_argument("--km", type=float); ap.add_argument("--to-km", type=float)
 ap.add_argument("--line", action="append", default=[])
+ap.add_argument("--overlay", type=int, default=224)
 ap.add_argument("--focus", type=float, default=0.5); ap.add_argument("--hfocus", type=float, default=0.5)
 a = ap.parse_args()
 
@@ -49,6 +50,7 @@ places = D["places"]
 if a.to_km: k1 = min(ROUTE, a.to_km)
 else:
     cands = [p for p in places if km + 200 <= p["km"] <= km + 300 and not p.get("near")] or [p for p in places if km + 200 <= p["km"] <= km + 300]
+    cands = [p for p in cands if p["note"]] or cands   # prefer real towns/landmarks
     k1 = min(cands, key=lambda p: abs(p["km"] - (km + 250)))["km"] if cands else min(ROUTE, km + 250)
 frm = min(places, key=lambda p: abs(p["km"] - km)); frm_name = frm["name"] if abs(frm["km"] - km) <= 15 else None
 to = min(places, key=lambda p: abs(p["km"] - k1)); to_name = to["name"] if abs(to["km"] - k1) <= 15 else None
@@ -62,15 +64,24 @@ nk = lambda x: f"{int(round(x)):,}".replace(",", ".")
 
 # ---------- photo top ----------
 PH = 860
-im = ImageOps.exif_transpose(src).convert("RGB"); r = W / PH
+im = ImageOps.exif_transpose(src).convert("RGB"); r = W / H
 if im.width / im.height > r:
     nw = round(im.height * r); x0 = round((im.width - nw) * a.hfocus); im = im.crop((x0, 0, x0 + nw, im.height))
 else:
     nh = round(im.width / r); y0 = round((im.height - nh) * a.focus); im = im.crop((0, y0, im.width, y0 + nh))
-im = im.resize((W, PH), Image.LANCZOS)
+im = im.resize((W, H), Image.LANCZOS)
 from desert_grade import apply_grade
 im = apply_grade(im, 1.0)
-canvas = Image.new("RGBA", (W, H), PAPER + (255,)); canvas.paste(im, (0, 0))
+# content area slightly softened so text sits on a calm surface
+soft = im.filter(ImageFilter.GaussianBlur(6)); m = Image.new("L", (W, H), 0)
+ImageDraw.Draw(m).rectangle([0, PH, W, H], fill=255); im.paste(soft, (0, 0), m.filter(ImageFilter.GaussianBlur(40)))
+canvas = im.convert("RGBA")
+# strong sand overlay: light over the top image area, strong over the content
+ov = Image.new("L", (1, H))
+for yy in range(H):
+    t = min(1, max(0, (yy - (PH - 260)) / 300))
+    ov.putpixel((0, yy), int(40 + (a.overlay - 40) * (t * t * (3 - 2 * t))))
+ol = Image.new("RGBA", (W, H), PAPER + (0,)); ol.putalpha(ov.resize((W, H))); canvas.alpha_composite(ol)
 # top gradient for the Instagram UI + logo
 g = Image.new("L", (1, 420)); [g.putpixel((0, y), int(160 * (1 - y / 419) ** 1.5)) for y in range(420)]
 tg = Image.new("RGBA", (W, 420), NIGHT + (0,)); tg.putalpha(g.resize((W, 420))); canvas.alpha_composite(tg, (0, 0))
@@ -112,15 +123,15 @@ L = 64
 canvas.alpha_composite(make_logo(40), (L, 250))
 
 # ---------- panel edge: terracotta band with UP NEXT tab ----------
-d.rectangle([0, PH - 6, W, PH + 6], fill=TERRA + (255,))
-tab_w = 290; d.rectangle([L, PH - 52, L + tab_w, PH + 6], fill=TERRA + (255,))
+d.rectangle([0, PH - 3, W, PH + 3], fill=TERRA + (255,))
+tab_w = 290; d.rectangle([L, PH - 52, L + tab_w, PH + 3], fill=TERRA + (255,))
 spaced(d, (L + tab_w / 2, PH - 16), "UP NEXT", font("Anton", 40), (255, 255, 255, 255), 6, "ms")
 
 # ---------- headline: distance + from -> to ----------
 y = PH + 140
 spaced(d, (L, y), f"NEXT {nk(dist)} KM", font("Anton", 118), INK + (255,), 0)
 if frm_name or to_name:
-    t = f"{(frm_name or '').upper()}  →  {(to_name or '').upper()}".strip()
+    t = f"{frm_name.upper()}  →  {(to_name or '').upper()}".strip() if frm_name else f"TO {to_name.upper()}"
     spaced(d, (L, y + 52), t, font("Inter ExtraBold", 28), TERRA + (255,), 2)
 
 # ---------- stat row ----------
@@ -156,7 +167,7 @@ x = X(top_k) * SS; yy = Y(top_e) * SS
 b.polygon([(x, yy - 16 * SS), (x - 9 * SS, yy - 30 * SS), (x + 9 * SS, yy - 30 * SS)], fill=TERRA + (255,))
 canvas.alpha_composite(big.resize((W, H), Image.LANCZOS)); d = ImageDraw.Draw(canvas)
 fk = font("Inter Bold", 17)
-spaced(d, (px0, py1 + 30), (frm_name or "START").upper(), fk, MUTED + (255,), 2)
+spaced(d, (px0, py1 + 30), (frm_name or "FROM HERE").upper(), fk, MUTED + (255,), 2)
 spaced(d, (px1, py1 + 30), (to_name or f"+{nk(dist)} KM").upper(), fk, MUTED + (255,), 2, "rs")
 
 # ---------- teaser lines ----------
