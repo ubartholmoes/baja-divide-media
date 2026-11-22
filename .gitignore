@@ -1,0 +1,5 @@
+kit/model/
+kit/node_modules/
+kit/fonts/
+kit/package*.json
+kit/__pycache__/
