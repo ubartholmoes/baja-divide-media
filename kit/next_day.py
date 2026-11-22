@@ -87,12 +87,19 @@ g = Image.new("L", (1, 420)); [g.putpixel((0, y), int(160 * (1 - y / 419) ** 1.5
 tg = Image.new("RGBA", (W, 420), NIGHT + (0,)); tg.putalpha(g.resize((W, 420))); canvas.alpha_composite(tg, (0, 0))
 d = ImageDraw.Draw(canvas)
 
+SYMBOLS = "▲▼→●"           # not in the latin woff subsets -> draw these with DejaVu Sans Bold
+_fb = {}
+def gf(ch, f):
+    if ch not in SYMBOLS: return f
+    if f.size not in _fb:
+        _fb[f.size] = ImageFont.truetype(subprocess.check_output(["fc-match", "-f", "%{file}", "DejaVu Sans:bold"]).decode(), int(f.size * 0.8))
+    return _fb[f.size]
 def spaced(dr, xy, text, f, fill, track, anchor="ls"):
     x, y = xy
-    w = sum(dr.textlength(c, font=f) for c in text) + track * (len(text) - 1)
+    w = sum(dr.textlength(c, font=gf(c, f)) for c in text) + track * (len(text) - 1)
     if anchor == "rs": x -= w
     if anchor == "ms": x -= w / 2
-    for ch in text: dr.text((x, y), ch, font=f, fill=fill, anchor="ls"); x += dr.textlength(ch, font=f) + track
+    for ch in text: dr.text((x, y), ch, font=gf(ch, f), fill=fill, anchor="ls"); x += dr.textlength(ch, font=gf(ch, f)) + track
     return x - track
 
 # ---------- logo on the photo ----------

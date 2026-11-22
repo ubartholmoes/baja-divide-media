@@ -83,9 +83,16 @@ for y in range(GH): g.putpixel((0, y), int(235 * (y / (GH - 1)) ** 1.25))
 grad = Image.new("RGBA", (W, GH), NIGHT + (0,)); grad.putalpha(g.resize((W, GH))); im.alpha_composite(grad, (0, H - GH))
 
 SS = 4
+SYMBOLS = "▲▼→●"           # not in the latin woff subsets -> draw these with DejaVu Sans Bold
+_fb = {}
+def gf(ch, f):
+    if ch not in SYMBOLS: return f
+    if f.size not in _fb:
+        _fb[f.size] = ImageFont.truetype(subprocess.check_output(["fc-match", "-f", "%{file}", "DejaVu Sans:bold"]).decode(), int(f.size * 0.8))
+    return _fb[f.size]
 def spaced(d, xy, text, f, fill, track):
     x, y = xy
-    for ch in text: d.text((x, y), ch, font=f, fill=fill, anchor="ls"); x += d.textlength(ch, font=f) + track
+    for ch in text: d.text((x, y), ch, font=gf(ch, f), fill=fill, anchor="ls"); x += d.textlength(ch, font=gf(ch, f)) + track
     return x - track
 def text_w(d, text, f, track): return sum(d.textlength(c, font=f) for c in text) + track * (len(text) - 1)
 

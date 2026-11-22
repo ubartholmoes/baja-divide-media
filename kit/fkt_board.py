@@ -78,10 +78,17 @@ shade = shade.filter(ImageFilter.GaussianBlur(110))
 im.alpha_composite(Image.merge("RGBA", [Image.new("L", (W, H), c) for c in NIGHT] + [shade]))
 d = ImageDraw.Draw(im)
 
+SYMBOLS = "▲▼→●"           # not in the latin woff subsets -> draw these with DejaVu Sans Bold
+_fb = {}
+def gf(ch, f):
+    if ch not in SYMBOLS: return f
+    if f.size not in _fb:
+        _fb[f.size] = ImageFont.truetype(subprocess.check_output(["fc-match", "-f", "%{file}", "DejaVu Sans:bold"]).decode(), int(f.size * 0.8))
+    return _fb[f.size]
 def spaced(dr, xy, text, f, fill, track, anchor="ls"):
     x, y = xy
-    if anchor == "rs": x -= sum(dr.textlength(c, font=f) for c in text) + track * (len(text) - 1)
-    for ch in text: dr.text((x, y), ch, font=f, fill=fill, anchor="ls"); x += dr.textlength(ch, font=f) + track
+    if anchor == "rs": x -= sum(dr.textlength(c, font=gf(c, f)) for c in text) + track * (len(text) - 1)
+    for ch in text: dr.text((x, y), ch, font=gf(ch, f), fill=fill, anchor="ls"); x += dr.textlength(ch, font=gf(ch, f)) + track
     return x - track
 
 # ---------- logo (top) ----------

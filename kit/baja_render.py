@@ -93,10 +93,17 @@ def draw_cactus(d, ox, oy, k, mirror):
         for p in (pts[0], pts[-1]):
             d.ellipse([p[0] - w / 2, p[1] - w / 2, p[0] + w / 2, p[1] + w / 2], fill=CACTUS + (255,))
 
+SYMBOLS = "▲▼→●"           # not in the latin woff subsets -> draw these with DejaVu Sans Bold
+_fb = {}
+def gf(ch, f):
+    if ch not in SYMBOLS: return f
+    if f.size not in _fb:
+        _fb[f.size] = ImageFont.truetype(subprocess.check_output(["fc-match", "-f", "%{file}", "DejaVu Sans:bold"]).decode(), int(f.size * 0.8))
+    return _fb[f.size]
 def spaced(d, xy, text, font, fill, track):
     x, y = xy
     for ch in text:
-        d.text((x, y), ch, font=font, fill=fill, anchor="ls"); x += d.textlength(ch, font=font) + track
+        d.text((x, y), ch, font=gf(ch, font), fill=fill, anchor="ls"); x += d.textlength(ch, font=gf(ch, font)) + track
     return x - track
 
 def make_logo(cap):
