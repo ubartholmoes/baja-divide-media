@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """"Story FKT" – full-screen info board (1080x1920): the GPX route fills the screen, the photo is only a dark
-blurred backdrop. Shows position, the FKT-record ghost, time delta, km, climbing, day/time.
+blurred backdrop. Shows position, the FKT dot (record position from the 2022 pings), time delta, km, climbing, day/time.
 Only on explicit request ("Story FKT").
 
 KM/day/time come from the photo EXIF like story_render.py (GPS snapped to the track); overrides possible.
@@ -52,7 +52,8 @@ if day and time_s:
     t0 = dt.datetime.strptime(a.start, "%Y-%m-%d %H:%M")
     now = dt.datetime.combine(START + dt.timedelta(days=day - 1), dt.datetime.strptime(time_s, "%H:%M").time())
     el = (now - t0).total_seconds() / 3600
-    ghost_km = max(0, min(ROUTE, el / a.record_h * ROUTE)); delta = el - km / ROUTE * a.record_h
+    from fkt_splits import record_h_at, record_km_at   # 2022 record pings, linear fallback
+    ghost_km = record_km_at(el, ROUTE, a.record_h); delta = el - record_h_at(km, ROUTE, a.record_h)
 step = D["profile_step_km"]; climb = D["climb_cum_m"]
 def at(arr, k):
     i = min(int(k // step), len(arr) - 2); f = (k - i * step) / step; return arr[i] + (arr[i + 1] - arr[i]) * f

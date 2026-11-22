@@ -128,8 +128,9 @@ if a.ghost and km is not None and day and time_s:
     t0 = dt.datetime.strptime(a.start, "%Y-%m-%d %H:%M")
     now = dt.datetime.combine(START + dt.timedelta(days=day - 1), dt.datetime.strptime(time_s, "%H:%M").time())
     el = (now - t0).total_seconds() / 3600
-    ghost_km = max(0, min(ROUTE_KM, el / a.record_h * ROUTE_KM))
-    delta_h = el - km / ROUTE_KM * a.record_h          # > 0: behind record pace
+    from fkt_splits import record_h_at, record_km_at   # 2022 record pings, linear fallback
+    ghost_km = record_km_at(el, ROUTE_KM, a.record_h)
+    delta_h = el - record_h_at(km, ROUTE_KM, a.record_h)   # > 0: behind record pace
 def hm(h): h = abs(h); return f"{int(h)}:{int(round((h - int(h)) * 60)) % 60:02d} H"
 d = ImageDraw.Draw(im)
 L = 60
