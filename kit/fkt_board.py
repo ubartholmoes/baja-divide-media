@@ -111,10 +111,23 @@ def make_logo(cap):
 L = 64
 logo = make_logo(62); im.alpha_composite(logo, (L, 270))
 d = ImageDraw.Draw(im)
-spaced(d, (L, 270 + logo.height + 40), "FKT ATTEMPT", font("Inter ExtraBold", 26), GOLD + (255,), 5)
+bb = logo.getbbox(); LX0, LX1 = L + bb[0], L + bb[2]; LW = LX1 - LX0      # ink width of the logo
+def ink(text, f):            # (left bearing, ink width) of a string drawn char by char without tracking
+    l0 = f.getbbox(text[0])[0]; adv = sum(f.getlength(c) for c in text[:-1])
+    return l0, adv + f.getbbox(text[-1])[2] - l0
+def justify(text, f, y, fill):
+    l0, w = ink(text, f)
+    spaced(d, (LX0 - l0, y), text, f, fill, (LW - w) / (len(text) - 1))
+justify("FKT ATTEMPT", font("Inter ExtraBold", 26), 270 + logo.height + 40, GOLD + (255,))
 if day or time_s:
-    t = "  ·  ".join(([f"DAY {day}"] if day else []) + ([time_s] if time_s else []))
-    spaced(d, (L, 270 + logo.height + 78), t, font("Inter Bold", 24), SAND + (230,), 3)
+    fd = font("Inter Bold", 24); yd = 270 + logo.height + 78
+    if day and time_s:
+        t1 = f"DAY {day}"; spaced(d, (LX0 - ink(t1, fd)[0], yd), t1, fd, SAND + (230,), 3)
+        r_bear = fd.getlength(time_s[-1]) - fd.getbbox(time_s[-1])[2]
+        spaced(d, (LX1 + r_bear, yd), time_s, fd, SAND + (230,), 3, "rs")
+        d.text(((LX0 + LX1) / 2, yd), "·", font=fd, fill=SAND + (230,), anchor="ms")
+    else:
+        justify(f"DAY {day}" if day else time_s, fd, yd, SAND + (230,))
 
 # ---------- map: the GPX line fills the screen diagonally ----------
 tr = D["track"]; lat0 = sum(t[1] for t in tr) / len(tr); cx = math.cos(math.radians(lat0))
