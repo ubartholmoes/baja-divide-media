@@ -29,7 +29,7 @@ def font(name, size):
 ap = argparse.ArgumentParser()
 ap.add_argument("photo"); ap.add_argument("out")
 ap.add_argument("--km", type=float); ap.add_argument("--day", type=int); ap.add_argument("--time")
-ap.add_argument("--record-h", type=float, default=253.4); ap.add_argument("--start", default="2026-12-30 07:00")
+ap.add_argument("--record-h", type=float, default=253.4); ap.add_argument("--start", default="2026-12-30 10:00")
 a = ap.parse_args()
 
 # ---------- data from EXIF (same logic as story_render) ----------
@@ -66,10 +66,16 @@ if im.width / im.height > r:
     nw = round(im.height * r); x0 = (im.width - nw) // 2; im = im.crop((x0, 0, x0 + nw, im.height))
 else:
     nh = round(im.width / r); y0 = (im.height - nh) // 2; im = im.crop((0, y0, im.width, y0 + nh))
-im = im.resize((W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(18))
+im = im.resize((W, H), Image.LANCZOS).filter(ImageFilter.GaussianBlur(3))
 from desert_grade import apply_grade
 im = apply_grade(im, 1.0).convert("RGBA")
-im.alpha_composite(Image.new("RGBA", (W, H), NIGHT + (205,)))
+im.alpha_composite(Image.new("RGBA", (W, H), NIGHT + (115,)))       # light overall veil – the photo stays recognisable
+# extra soft shade only where text sits: top-left (logo), top-right (KM), bottom-left (delta), bottom (bar)
+shade = Image.new("L", (W, H), 0); sd = ImageDraw.Draw(shade)
+for box in [(-200, 150, 560, 760), (380, 380, 1280, 900), (-200, 1120, 700, 1580), (-100, 1600, 1180, 2100)]:
+    sd.ellipse(box, fill=150)
+shade = shade.filter(ImageFilter.GaussianBlur(110))
+im.alpha_composite(Image.merge("RGBA", [Image.new("L", (W, H), c) for c in NIGHT] + [shade]))
 d = ImageDraw.Draw(im)
 
 def spaced(dr, xy, text, f, fill, track, anchor="ls"):
@@ -140,7 +146,9 @@ glow = Image.new("RGBA", lay.size, (0, 0, 0, 0)); gd = ImageDraw.Draw(glow); rr 
 gd.ellipse([px-rr, py-rr, px+rr, py+rr], fill=TERRA + (170,)); glow = glow.filter(ImageFilter.GaussianBlur(30 * SS))
 lay = Image.alpha_composite(glow, lay); m = ImageDraw.Draw(lay); rr = 19 * SS
 m.ellipse([px-rr, py-rr, px+rr, py+rr], fill=TERRA + (255,), outline=(255, 255, 255, 255), width=5 * SS)
-im.alpha_composite(lay.resize((W, H), Image.LANCZOS))
+shadow = lay.split()[3].filter(ImageFilter.GaussianBlur(8 * SS)).point(lambda v: min(255, int(v * 1.3)))
+sh = Image.new("RGBA", lay.size, NIGHT + (0,)); sh.putalpha(shadow)
+im.alpha_composite(Image.alpha_composite(sh, lay).resize((W, H), Image.LANCZOS))
 d = ImageDraw.Draw(im)
 
 # ---------- stats in the empty triangles ----------

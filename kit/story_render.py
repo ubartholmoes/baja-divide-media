@@ -39,7 +39,7 @@ ap.add_argument("--live-url", default="WWW.UBA-CYCLING.DE/LIVE")
 ap.add_argument("--minimap", action="store_true", help="small route map (from the GPX) bottom right")
 ap.add_argument("--ghost", action="store_true", help="race the FKT record: ghost marker on the route bar + time delta")
 ap.add_argument("--record-h", type=float, default=253.4, help="FKT record in hours (10 d 13 h 24 min)")
-ap.add_argument("--start", default="2026-12-30 07:00", help="start time in Tecate (local)")
+ap.add_argument("--start", default="2026-12-30 10:00", help="start time in Tecate (local)")
 a = ap.parse_args()
 
 src = Image.open(a.photo); ex = src.getexif()
