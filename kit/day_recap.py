@@ -118,7 +118,10 @@ else:
 im = im.resize((W, H), Image.LANCZOS)
 from desert_grade import apply_grade
 im = apply_grade(im, 1.0)
-PH = 820
+# text block is anchored to the route bar at the bottom: no empty gap, more photo on top
+BY = 1712
+HAS_CHART = len(gap) >= 2
+PH = BY - (750 if HAS_CHART else 520)
 soft = im.filter(ImageFilter.GaussianBlur(7)); m = Image.new("L", (W, H), 0)
 ImageDraw.Draw(m).rectangle([0, PH, W, H], fill=255); im.paste(soft, (0, 0), m.filter(ImageFilter.GaussianBlur(40)))
 canvas = im.convert("RGBA")
@@ -131,31 +134,31 @@ d = ImageDraw.Draw(canvas); L, R_ = 64, W - 64
 
 # ---------- headline ----------
 d.rectangle([L, PH, L + 90, PH + 5], fill=GOLD + (255,))
-x = spaced(d, (L, PH + 150), f"DAY {day}", font("Anton", 150), SAND + (255,), 0)
-spaced(d, (x + 26, PH + 150), "RECAP", font("Anton", 56), GOLD + (255,), 4)
+x = spaced(d, (L, PH + 132), f"DAY {day}", font("Anton", 132), SAND + (255,), 0)
+spaced(d, (x + 24, PH + 132), "RECAP", font("Anton", 56), GOLD + (255,), 4)
 date_s = end_local.strftime("%d.%m.%Y") if end_local else (dt.date(2026, 12, 29) + dt.timedelta(days=day)).strftime("%d.%m.%Y")
-spaced(d, (R_, PH + 150), date_s, font("Inter Bold", 22), SAND + (190,), 3, "rs")
+spaced(d, (R_, PH + 132), date_s, font("Inter Bold", 22), SAND + (190,), 3, "rs")
 def where(k):
     n = place_at(k)
     if n: return n.upper()
     p = min(places, key=lambda p: abs(p["km"] - k))
     return f"NEAR {p['name'].upper()}" if abs(p["km"] - k) <= 40 else f"KM {nk(k)}"
-spaced(d, (L, PH + 205), f"{where(k0)}  →  {where(k1)}", font("Inter ExtraBold", 27), TERRA + (255,), 2)
+spaced(d, (L, PH + 182), f"{where(k0)}  →  {where(k1)}", font("Inter ExtraBold", 27), TERRA + (255,), 2)
 
 # ---------- 2x2 stats ----------
 cells = [(nk(k1 - k0), "KM", "TODAY"), (nk(gain), "M", "CLIMBED TODAY"),
          ((hm(ride) if ride else "–"), "H", "RIDING TIME"), (nk(k1), "KM", f"TOTAL · {k1 / ROUTE * 100:.0f} %")]
 cw = (R_ - L) / 2
 for i, (v, unit, lbl) in enumerate(cells):
-    x, y = L + (i % 2) * cw, PH + 335 + (i // 2) * 150
-    xe = spaced(d, (x, y), v, font("Anton", 84), (255, 255, 255, 255), 0)
+    x, y = L + (i % 2) * cw, PH + 292 + (i // 2) * 128
+    xe = spaced(d, (x, y), v, font("Anton", 80), (255, 255, 255, 255), 0)
     spaced(d, (xe + 10, y), unit, font("Anton", 40), SAND + (255,), 1)
     spaced(d, (x, y + 32), lbl, font("Inter Bold", 19), SAND + (170,), 3)
-d.line([(L + cw - 30, PH + 262), (L + cw - 30, PH + 520)], fill=SAND + (60,), width=2)
+d.line([(L + cw - 30, PH + 228), (L + cw - 30, PH + 452)], fill=SAND + (60,), width=2)
 
 # ---------- gap to the record ----------
-cy0, cy1 = PH + 630, PH + 800
-if len(gap) >= 2:
+cy0, cy1 = PH + 548, PH + 668
+if HAS_CHART:
     now_gap = gap[-1][1]; ahead = now_gap >= 0; col = GREEN if ahead else RED
     spaced(d, (L, cy0 - 26), "VS. FKT RECORD", font("Inter ExtraBold", 21), SAND + (200,), 3)
     spaced(d, (R_, cy0 - 26), ("▲ " if ahead else "▼ ") + hm(now_gap) + (" H AHEAD" if ahead else " H BEHIND"),
@@ -180,10 +183,10 @@ if len(gap) >= 2:
     spaced(d, (X1, z - 8), "FKT PACE", font("Inter Bold", 16), SAND + (170,), 2, "rs")
     fd = font("Inter Bold", 16)
     for dd in range(1, days_total + 1):
-        d.text((X((dd - 0.5) * 24), cy1 + 26), str(dd), font=fd, fill=SAND + (150 if dd != day else 255,), anchor="ms")
+        d.text((X((dd - 0.5) * 24), cy1 + 24), str(dd), font=fd, fill=SAND + (150 if dd != day else 255,), anchor="ms")
 
 # ---------- route bar with today's stretch ----------
-by = 1712; bx0, bx1 = L, R_
+by = BY; bx0, bx1 = L, R_
 big = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0)); b = ImageDraw.Draw(big)
 XB = lambda k: (bx0 + (bx1 - bx0) * k / ROUTE) * SS
 b.line([(bx0 * SS, by * SS), (bx1 * SS, by * SS)], fill=SAND + (90,), width=9 * SS)

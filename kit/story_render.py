@@ -36,10 +36,6 @@ ap.add_argument("--focus", type=float, default=0.5); ap.add_argument("--hfocus",
 ap.add_argument("--grade", type=float, default=1.0)
 ap.add_argument("--live", choices=["A", "B"], help="live-tracking story instead of the KM stamp (every 5th story)")
 ap.add_argument("--live-url", default="WWW.UBA-CYCLING.DE/LIVE")
-ap.add_argument("--minimap", action="store_true", help="small route map (from the GPX) bottom right")
-ap.add_argument("--ghost", action="store_true", help="race the FKT record: ghost marker on the route bar + time delta")
-ap.add_argument("--record-h", type=float, default=253.4, help="FKT record in hours (10 d 13 h 24 min)")
-ap.add_argument("--start", default="2026-12-30 10:00", help="start time in Tecate (local)")
 a = ap.parse_args()
 
 src = Image.open(a.photo); ex = src.getexif()
@@ -122,16 +118,6 @@ def make_logo(cap):
         else: d.text((x, base), s, font=fa, fill=SAND + (255,), anchor="ls"); x += fa.getlength(s)
     return img.resize((img.width // SS, img.height // SS), Image.LANCZOS), (bcap + gap + cap * SS / 2) / SS
 
-# ---- race against the record (linear record pace over the route) ----
-ghost_km = delta_h = None
-if a.ghost and km is not None and day and time_s:
-    t0 = dt.datetime.strptime(a.start, "%Y-%m-%d %H:%M")
-    now = dt.datetime.combine(START + dt.timedelta(days=day - 1), dt.datetime.strptime(time_s, "%H:%M").time())
-    el = (now - t0).total_seconds() / 3600
-    from fkt_splits import record_h_at, record_km_at   # 2022 record pings, linear fallback
-    ghost_km = record_km_at(el, ROUTE_KM, a.record_h)
-    delta_h = el - record_h_at(km, ROUTE_KM, a.record_h)   # > 0: behind record pace
-def hm(h): h = abs(h); return f"{int(h)}:{int(round((h - int(h)) * 60)) % 60:02d} H"
 d = ImageDraw.Draw(im)
 L = 60
 # stamp: KM figure, and right of it two small lines (DAY · TIME / NEAR PLACE)
@@ -172,9 +158,6 @@ else:
     lines = []
     if line1: lines.append((line1, fsub, GOLD + (255,), 2))
     if place: lines.append((("NEAR " + place).upper(), fpl, SAND + (245,), 1.5))
-    if delta_h is not None:
-        txt = ("▲ " + hm(delta_h) + " AHEAD OF FKT PACE") if delta_h <= 0 else ("▼ " + hm(delta_h) + " BEHIND FKT PACE")
-        lines.append((txt, font("Inter ExtraBold", 20), ((170, 214, 140) if delta_h <= 0 else (238, 120, 70)) + (255,), 1.5))
     ys = {1: [-18], 2: [-34, -3], 3: [-52, -26, 0]}[len(lines)] if lines else []
     for (t_, f_, c_, tr_), yy in zip(lines, ys):
         soft((xs, STAMP_Y + yy), t_, f_, c_, tr_)
@@ -188,41 +171,11 @@ prog = 0 if km is None else max(0, min(1, km / ROUTE_KM)); xm = x0 + (x1 - x0) *
 b.rounded_rectangle([x0, ry - th/2, x1, ry + th/2], radius=th/2, fill=SAND + (95,))
 b.rounded_rectangle([x0, ry - th/2, max(xm, x0 + th), ry + th/2], radius=th/2, fill=TERRA + (255,))
 re_ = 10 * SS; b.ellipse([x1-re_, ry-re_, x1+re_, ry+re_], fill=NIGHT + (255,), outline=SAND + (255,), width=4 * SS)
-if ghost_km is not None:
-    xg = x0 + (x1 - x0) * ghost_km / ROUTE_KM; rg = 11 * SS
-    b.ellipse([xg-rg, ry-rg, xg+rg, ry+rg], fill=(255, 255, 255, 60), outline=(255, 255, 255, 230), width=3 * SS)
 rm = 14 * SS; b.ellipse([xm-rm, ry-rm, xm+rm, ry+rm], fill=TERRA + (255,), outline=(255, 255, 255, 255), width=4 * SS)
 im.alpha_composite(big.resize((W, H), Image.LANCZOS))
-if ghost_km is not None:
-    fg = font("Inter ExtraBold", 14); dg = ImageDraw.Draw(im)
-    dg.text((xg / SS, FOOT_Y - 20), "FKT", font=fg, fill=(255, 255, 255, 230), anchor="ms")
 d = ImageDraw.Draw(im); fl = font("Inter Bold", 15)
 spaced(d, (x0 / SS, FOOT_Y + 30), "TECATE", fl, SAND + (220,), 1.5)
 t = "SAN JOSÉ DEL CABO"; spaced(d, (x1 / SS - text_w(d, t, fl, 1.5), FOOT_Y + 30), t, fl, SAND + (220,), 1.5)
-
-# ---- mini map: the GPX line itself draws the peninsula ----
-if a.minimap and "track" in D:
-    from PIL import ImageFilter
-    tr = D["track"]; lat0 = sum(t[1] for t in tr) / len(tr); cx = math.cos(math.radians(lat0))
-    xs_ = [t[2] * cx for t in tr]; ys_ = [-t[1] for t in tr]
-    mw = 175; sc = mw / (max(xs_) - min(xs_)); mh = (max(ys_) - min(ys_)) * sc
-    ox, oy = W - L - mw, STAMP_Y + 10 - mh            # bottom-right, bottom aligned with the stamp
-    P = lambda i: ((ox + (xs_[i] - min(xs_)) * sc) * SS, (oy + (ys_[i] - min(ys_)) * sc) * SS)
-    layer = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0)); m = ImageDraw.Draw(layer)
-    m.line([P(i) for i in range(len(tr))], fill=SAND + (190,), width=4 * SS, joint="curve")
-    ki = max(0, min(len(tr) - 1, int(round((km or 0) / 2))))
-    if ki > 0: m.line([P(i) for i in range(ki + 1)], fill=TERRA + (255,), width=6 * SS, joint="curve")
-    if ghost_km is not None:
-        gx, gy = P(min(len(tr) - 1, int(round(ghost_km / 2)))); rg = 8 * SS
-        m.ellipse([gx-rg, gy-rg, gx+rg, gy+rg], outline=(255, 255, 255, 230), width=2 * SS)
-    px, py = P(ki)
-    glow = Image.new("RGBA", (W * SS, H * SS), (0, 0, 0, 0)); gd = ImageDraw.Draw(glow); rr = 26 * SS
-    gd.ellipse([px-rr, py-rr, px+rr, py+rr], fill=TERRA + (150,)); glow = glow.filter(ImageFilter.GaussianBlur(14 * SS))
-    layer = Image.alpha_composite(glow, layer); m = ImageDraw.Draw(layer); rr = 10 * SS
-    m.ellipse([px-rr, py-rr, px+rr, py+rr], fill=TERRA + (255,), outline=(255, 255, 255, 255), width=3 * SS)
-    shadow = layer.split()[3].filter(ImageFilter.GaussianBlur(7 * SS)).point(lambda v: min(255, v * 1.1))
-    sh = Image.new("RGBA", layer.size, NIGHT + (0,)); sh.putalpha(shadow)
-    im.alpha_composite(Image.alpha_composite(sh, layer).resize((W, H), Image.LANCZOS))
 
 im.convert("RGB").save(a.out, quality=92, subsampling=0)
 print("saved", a.out, {"km": km, "day": day, "time": time_s, "place": place})
